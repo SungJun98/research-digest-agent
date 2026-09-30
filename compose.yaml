@@ -1,0 +1,11 @@
+services:
+  digest:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: [serve, --config, /config/config.yaml]
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - digest-state:/home/app/.local/share/research-digest
+volumes:
+  digest-state:

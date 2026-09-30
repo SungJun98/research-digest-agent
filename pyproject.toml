@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "research-digest-agent"
 version = "0.1.0"
 description = "A configurable, evidence-aware research digest and follow-up watcher"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = ["typer>=0.12,<1", "pydantic>=2.7,<3", "PyYAML>=6,<7", "httpx>=0.27,<1", "beautifulsoup4>=4.12,<5", "tzdata>=2024.1"]

@@ -15,3 +15,5 @@ digests/
 state/
 .superpowers/
 .DS_Store
+!/.env.example
+.venv-*/

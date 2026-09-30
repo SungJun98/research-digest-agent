@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir . && useradd --create-home --uid 10001 app \
+    && mkdir -p /home/app/.local/share/research-digest \
+    && chown -R app:app /home/app/.local/share/research-digest
+USER app
+ENTRYPOINT ["research-digest"]
+CMD ["serve", "--config", "/config/config.yaml"]

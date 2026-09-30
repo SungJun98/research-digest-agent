@@ -1,0 +1,118 @@
+{
+  "arxiv:2609.99001": {
+    "topic_id": "safety",
+    "relevance": 4,
+    "importance": 4,
+    "evidence": 4,
+    "fit": 4,
+    "reason": "중요한 신뢰성 문제를 다룹니다.",
+    "contribution": "저자 주장에서 제안한 개선을 확인할 수 있습니다.",
+    "fit_reason": "관심 주제와 연결되는 원리를 살펴볼 수 있습니다.",
+    "limitation": "예제이며 실제 논문 평가가 아닙니다.",
+    "reading_question": "조건이 바뀌어도 결과가 유지될까요?",
+    "problem_concepts": [
+      "safety"
+    ],
+    "method_concepts": [
+      "Oversight under changing conditions"
+    ],
+    "problem_description": "Oversight under changing conditions",
+    "contribution_description": "An oversight method compares verified and unverified decisions under distribution shift.",
+    "is_adjacent": false,
+    "evidence_spans": [
+      {
+        "text": "An oversight method compares verified and unverified decisions under distribution shift.",
+        "source": "abstract",
+        "url": ""
+      }
+    ],
+    "coverage": "abstract"
+  },
+  "arxiv:2609.99002": {
+    "topic_id": "reasoning",
+    "relevance": 4,
+    "importance": 4,
+    "evidence": 4,
+    "fit": 4,
+    "reason": "중요한 신뢰성 문제를 다룹니다.",
+    "contribution": "저자 주장에서 제안한 개선을 확인할 수 있습니다.",
+    "fit_reason": "관심 주제와 연결되는 원리를 살펴볼 수 있습니다.",
+    "limitation": "예제이며 실제 논문 평가가 아닙니다.",
+    "reading_question": "조건이 바뀌어도 결과가 유지될까요?",
+    "problem_concepts": [
+      "reasoning"
+    ],
+    "method_concepts": [
+      "Adaptive verification for reasoning"
+    ],
+    "problem_description": "Adaptive verification for reasoning",
+    "contribution_description": "Adaptive verification allocates computation to uncertain reasoning steps.",
+    "is_adjacent": false,
+    "evidence_spans": [
+      {
+        "text": "Adaptive verification allocates computation to uncertain reasoning steps.",
+        "source": "abstract",
+        "url": ""
+      }
+    ],
+    "coverage": "abstract"
+  },
+  "arxiv:2609.99003": {
+    "topic_id": "learning",
+    "relevance": 4,
+    "importance": 4,
+    "evidence": 4,
+    "fit": 4,
+    "reason": "중요한 신뢰성 문제를 다룹니다.",
+    "contribution": "저자 주장에서 제안한 개선을 확인할 수 있습니다.",
+    "fit_reason": "관심 주제와 연결되는 원리를 살펴볼 수 있습니다.",
+    "limitation": "예제이며 실제 논문 평가가 아닙니다.",
+    "reading_question": "조건이 바뀌어도 결과가 유지될까요?",
+    "problem_concepts": [
+      "learning"
+    ],
+    "method_concepts": [
+      "Calibrated uncertainty in transfer"
+    ],
+    "problem_description": "Calibrated uncertainty in transfer",
+    "contribution_description": "Calibration improves uncertainty estimation under task transfer.",
+    "is_adjacent": false,
+    "evidence_spans": [
+      {
+        "text": "Calibration improves uncertainty estimation under task transfer.",
+        "source": "abstract",
+        "url": ""
+      }
+    ],
+    "coverage": "abstract"
+  },
+  "arxiv:2609.99004": {
+    "topic_id": "interpretability",
+    "relevance": 4,
+    "importance": 4,
+    "evidence": 4,
+    "fit": 4,
+    "reason": "중요한 신뢰성 문제를 다룹니다.",
+    "contribution": "저자 주장에서 제안한 개선을 확인할 수 있습니다.",
+    "fit_reason": "관심 주제와 연결되는 원리를 살펴볼 수 있습니다.",
+    "limitation": "예제이며 실제 논문 평가가 아닙니다.",
+    "reading_question": "조건이 바뀌어도 결과가 유지될까요?",
+    "problem_concepts": [
+      "interpretability"
+    ],
+    "method_concepts": [
+      "Causal explanations of model failures"
+    ],
+    "problem_description": "Causal explanations of model failures",
+    "contribution_description": "Causal interventions test whether explanations identify mechanisms of model failures.",
+    "is_adjacent": false,
+    "evidence_spans": [
+      {
+        "text": "Causal interventions test whether explanations identify mechanisms of model failures.",
+        "source": "abstract",
+        "url": ""
+      }
+    ],
+    "coverage": "abstract"
+  }
+}

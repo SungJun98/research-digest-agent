@@ -1,0 +1,13 @@
+.git
+.venv
+.venv-*
+.superpowers
+__pycache__
+.pytest_cache
+.env*
+config.yaml
+*.db*
+state
+digests
+dist
+build

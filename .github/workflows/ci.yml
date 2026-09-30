@@ -1,0 +1,31 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e '.[dev]'
+      - run: pytest -q
+      - run: python -m build
+      - name: Verify installed wheel away from checkout
+        run: |
+          python -m venv /tmp/digest-wheel
+          /tmp/digest-wheel/bin/pip install dist/*.whl
+          cp config.example.yaml /tmp/digest-example.yaml
+          cd /tmp
+          /tmp/digest-wheel/bin/research-digest preview --config /tmp/digest-example.yaml --offline-fixtures
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t research-digest:ci .
+      - run: docker run --rm -v "$PWD/config.example.yaml:/config/example.yaml:ro" research-digest:ci preview --config /config/example.yaml --offline-fixtures

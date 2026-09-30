@@ -1,0 +1,784 @@
+{
+  "$defs": {
+    "ArxivConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Categories",
+          "type": "array"
+        },
+        "queries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Queries",
+          "type": "array"
+        },
+        "max_results": {
+          "default": 200,
+          "maximum": 2000,
+          "minimum": 1,
+          "title": "Max Results",
+          "type": "integer"
+        }
+      },
+      "title": "ArxivConfig",
+      "type": "object"
+    },
+    "AuthorWatch": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "policy": {
+          "default": "next_digest",
+          "enum": [
+            "immediate",
+            "next_digest"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "topic_filter": {
+          "default": true,
+          "title": "Topic Filter",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "AuthorWatch",
+      "type": "object"
+    },
+    "EmailConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "host": {
+          "default": "",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 587,
+          "title": "Port",
+          "type": "integer"
+        },
+        "sender": {
+          "default": "",
+          "title": "Sender",
+          "type": "string"
+        },
+        "recipients": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recipients",
+          "type": "array"
+        },
+        "username_env": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username Env"
+        },
+        "password_env": {
+          "default": "SMTP_PASSWORD",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Password Env",
+          "type": "string"
+        },
+        "security": {
+          "default": "starttls",
+          "enum": [
+            "starttls",
+            "ssl"
+          ],
+          "title": "Security",
+          "type": "string"
+        }
+      },
+      "title": "EmailConfig",
+      "type": "object"
+    },
+    "FeedbackConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "suggestions_enabled": {
+          "default": true,
+          "title": "Suggestions Enabled",
+          "type": "boolean"
+        },
+        "min_explicit_signals": {
+          "default": 3,
+          "minimum": 3,
+          "title": "Min Explicit Signals",
+          "type": "integer"
+        }
+      },
+      "title": "FeedbackConfig",
+      "type": "object"
+    },
+    "HFConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 100,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "title": "HFConfig",
+      "type": "object"
+    },
+    "LLMConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "base_url": {
+          "default": "https://api.openai.com/v1",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "api_key_env": {
+          "default": "DIGEST_LLM_API_KEY",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Api Key Env",
+          "type": "string"
+        },
+        "max_requests_per_day": {
+          "default": 80,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Max Requests Per Day",
+          "type": "integer"
+        },
+        "max_output_tokens": {
+          "default": 1800,
+          "maximum": 10000,
+          "minimum": 200,
+          "title": "Max Output Tokens",
+          "type": "integer"
+        },
+        "json_mode": {
+          "default": true,
+          "title": "Json Mode",
+          "type": "boolean"
+        }
+      },
+      "title": "LLMConfig",
+      "type": "object"
+    },
+    "MarkdownConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "directory": {
+          "default": "~/.local/share/research-digest/digests",
+          "format": "path",
+          "title": "Directory",
+          "type": "string"
+        }
+      },
+      "title": "MarkdownConfig",
+      "type": "object"
+    },
+    "NotificationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "max_immediate_per_day": {
+          "default": 3,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Max Immediate Per Day",
+          "type": "integer"
+        },
+        "default_watch_policy": {
+          "default": "next_digest",
+          "enum": [
+            "immediate",
+            "next_digest"
+          ],
+          "title": "Default Watch Policy",
+          "type": "string"
+        },
+        "max_chars_per_paper": {
+          "default": 400,
+          "maximum": 2000,
+          "minimum": 100,
+          "title": "Max Chars Per Paper",
+          "type": "integer"
+        },
+        "email": {
+          "$ref": "#/$defs/EmailConfig"
+        },
+        "slack": {
+          "$ref": "#/$defs/WebhookConfig"
+        },
+        "discord": {
+          "$ref": "#/$defs/WebhookConfig"
+        },
+        "markdown": {
+          "$ref": "#/$defs/MarkdownConfig"
+        }
+      },
+      "title": "NotificationConfig",
+      "type": "object"
+    },
+    "PaperWatch": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "policy": {
+          "default": "next_digest",
+          "enum": [
+            "immediate",
+            "next_digest"
+          ],
+          "title": "Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "PaperWatch",
+      "type": "object"
+    },
+    "ProfileConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "topics": {
+          "items": {
+            "$ref": "#/$defs/Topic"
+          },
+          "minItems": 1,
+          "title": "Topics",
+          "type": "array"
+        },
+        "lenses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lenses",
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "summary_language": {
+          "default": "ko",
+          "title": "Summary Language",
+          "type": "string"
+        }
+      },
+      "title": "ProfileConfig",
+      "type": "object"
+    },
+    "RetrievalConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "top_k_per_topic": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Top K Per Topic",
+          "type": "integer"
+        },
+        "extra_candidates": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Extra Candidates",
+          "type": "integer"
+        },
+        "max_evaluations": {
+          "default": 50,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Max Evaluations",
+          "type": "integer"
+        },
+        "lookback_hours": {
+          "default": 72,
+          "maximum": 168,
+          "minimum": 1,
+          "title": "Lookback Hours",
+          "type": "integer"
+        },
+        "catchup_days": {
+          "default": 7,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Catchup Days",
+          "type": "integer"
+        },
+        "embeddings_enabled": {
+          "default": false,
+          "title": "Embeddings Enabled",
+          "type": "boolean"
+        },
+        "embedding_base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Base Url"
+        },
+        "embedding_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Model"
+        },
+        "embedding_key_env": {
+          "default": "DIGEST_EMBEDDING_API_KEY",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Embedding Key Env",
+          "type": "string"
+        },
+        "fulltext_enabled": {
+          "default": true,
+          "title": "Fulltext Enabled",
+          "type": "boolean"
+        },
+        "fulltext_top_k": {
+          "default": 8,
+          "maximum": 50,
+          "minimum": 0,
+          "title": "Fulltext Top K",
+          "type": "integer"
+        },
+        "fulltext_max_chars": {
+          "default": 8000,
+          "maximum": 32000,
+          "minimum": 500,
+          "title": "Fulltext Max Chars",
+          "type": "integer"
+        }
+      },
+      "title": "RetrievalConfig",
+      "type": "object"
+    },
+    "S2Config": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "api_key_env": {
+          "default": "SEMANTIC_SCHOLAR_API_KEY",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Api Key Env",
+          "type": "string"
+        },
+        "max_pages": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Pages",
+          "type": "integer"
+        }
+      },
+      "title": "S2Config",
+      "type": "object"
+    },
+    "ScheduleConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "timezone": {
+          "default": "Asia/Seoul",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "digest_at": {
+          "default": "09:00:00",
+          "format": "time",
+          "title": "Digest At",
+          "type": "string"
+        },
+        "watch_poll_minutes": {
+          "default": 60,
+          "minimum": 5,
+          "title": "Watch Poll Minutes",
+          "type": "integer"
+        },
+        "catchup": {
+          "default": true,
+          "title": "Catchup",
+          "type": "boolean"
+        }
+      },
+      "title": "ScheduleConfig",
+      "type": "object"
+    },
+    "ScholarMailConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "host": {
+          "default": "imap.gmail.com",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 993,
+          "title": "Port",
+          "type": "integer"
+        },
+        "mailbox": {
+          "default": "INBOX",
+          "title": "Mailbox",
+          "type": "string"
+        },
+        "username_env": {
+          "default": "SCHOLAR_IMAP_USERNAME",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Username Env",
+          "type": "string"
+        },
+        "password_env": {
+          "default": "SCHOLAR_IMAP_PASSWORD",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Password Env",
+          "type": "string"
+        },
+        "allowed_senders": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Senders",
+          "type": "array"
+        },
+        "max_messages": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Messages",
+          "type": "integer"
+        }
+      },
+      "title": "ScholarMailConfig",
+      "type": "object"
+    },
+    "SelectionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "min_relevance": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Min Relevance",
+          "type": "integer"
+        },
+        "min_importance": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Min Importance",
+          "type": "integer"
+        },
+        "min_evidence": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Min Evidence",
+          "type": "integer"
+        },
+        "unknown_attention_min": {
+          "default": 4,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Unknown Attention Min",
+          "type": "integer"
+        },
+        "base_min_score": {
+          "default": 3.5,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Base Min Score",
+          "type": "number"
+        },
+        "base_count": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Base Count",
+          "type": "integer"
+        },
+        "max_count": {
+          "default": 5,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Count",
+          "type": "integer"
+        },
+        "extra_min_score": {
+          "default": 4.0,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Extra Min Score",
+          "type": "number"
+        },
+        "max_per_topic": {
+          "default": 2,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Per Topic",
+          "type": "integer"
+        },
+        "max_adjacent": {
+          "default": 1,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Max Adjacent",
+          "type": "integer"
+        },
+        "mmr_relevance_weight": {
+          "default": 0.85,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Mmr Relevance Weight",
+          "type": "number"
+        },
+        "duplicate_semantic_threshold": {
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Duplicate Semantic Threshold",
+          "type": "number"
+        },
+        "duplicate_jaccard_threshold": {
+          "default": 0.8,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Duplicate Jaccard Threshold",
+          "type": "number"
+        },
+        "weights": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Weights",
+          "type": "object"
+        }
+      },
+      "title": "SelectionConfig",
+      "type": "object"
+    },
+    "SourcesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "arxiv": {
+          "$ref": "#/$defs/ArxivConfig"
+        },
+        "huggingface": {
+          "$ref": "#/$defs/HFConfig"
+        },
+        "scholar_mail": {
+          "$ref": "#/$defs/ScholarMailConfig"
+        },
+        "semantic_scholar": {
+          "$ref": "#/$defs/S2Config"
+        }
+      },
+      "title": "SourcesConfig",
+      "type": "object"
+    },
+    "Topic": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "priority": {
+          "default": 2,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Include",
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "description"
+      ],
+      "title": "Topic",
+      "type": "object"
+    },
+    "Watchlist": {
+      "additionalProperties": false,
+      "properties": {
+        "papers": {
+          "items": {
+            "$ref": "#/$defs/PaperWatch"
+          },
+          "title": "Papers",
+          "type": "array"
+        },
+        "authors": {
+          "items": {
+            "$ref": "#/$defs/AuthorWatch"
+          },
+          "title": "Authors",
+          "type": "array"
+        }
+      },
+      "title": "Watchlist",
+      "type": "object"
+    },
+    "WebhookConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "url_env": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Url Env",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_env"
+      ],
+      "title": "WebhookConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "$ref": "#/$defs/ProfileConfig"
+    },
+    "sources": {
+      "$ref": "#/$defs/SourcesConfig"
+    },
+    "selection": {
+      "$ref": "#/$defs/SelectionConfig"
+    },
+    "schedule": {
+      "$ref": "#/$defs/ScheduleConfig"
+    },
+    "watchlist": {
+      "$ref": "#/$defs/Watchlist"
+    },
+    "retrieval": {
+      "$ref": "#/$defs/RetrievalConfig"
+    },
+    "feedback": {
+      "$ref": "#/$defs/FeedbackConfig"
+    },
+    "notifications": {
+      "$ref": "#/$defs/NotificationConfig"
+    },
+    "llm": {
+      "$ref": "#/$defs/LLMConfig"
+    },
+    "state_path": {
+      "default": "~/.local/share/research-digest/state.db",
+      "format": "path",
+      "title": "State Path",
+      "type": "string"
+    }
+  },
+  "title": "AppConfig",
+  "type": "object"
+}
