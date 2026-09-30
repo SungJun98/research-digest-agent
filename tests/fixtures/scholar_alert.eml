@@ -1,0 +1,18 @@
+From: Google Scholar <scholaralerts-noreply@google.com>
+Subject: New research in reasoning
+Date: Wed, 30 Sep 2026 00:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="bound"
+
+--bound
+Content-Type: text/plain; charset=utf-8
+
+Reliable reasoning systems
+https://arxiv.org/abs/2609.12345v2
+--bound
+Content-Type: text/html; charset=utf-8
+
+<h3><a href="https://scholar.google.com/scholar_url?url=https%3A%2F%2Farxiv.org%2Fabs%2F2609.12345v2">Reliable reasoning systems</a></h3><div class="gse_alrt_sni">Reasoning with reliable verification.</div>
+<h3><a href="https://example.org/paper">Measuring generalization under shifts</a></h3>
+<a href="https://google.com/unsubscribe">Unsubscribe</a>
+--bound--
