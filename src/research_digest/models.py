@@ -46,3 +46,41 @@ class Paper(BaseModel):
     def canonical_id(self) -> str:
         from .identity import canonicalize
         return canonicalize(self)
+
+
+from typing import Literal
+from pydantic import ConfigDict
+
+
+class FulltextContext(BaseModel):
+    text: str
+    url: str
+    coverage: Literal['partial_html'] = 'partial_html'
+
+
+class EvidenceSpan(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    text: str = Field(min_length=3,max_length=1500)
+    source: Literal['abstract','partial_html']
+    url: str
+
+
+class Evaluation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    topic_id: str | None
+    relevance: int = Field(ge=1,le=5,strict=True)
+    importance: int = Field(ge=1,le=5,strict=True)
+    evidence: int = Field(ge=1,le=5,strict=True)
+    fit: int = Field(ge=1,le=5,strict=True)
+    reason: str = Field(min_length=1,max_length=600)
+    contribution: str = Field(min_length=1,max_length=600)
+    fit_reason: str = Field(min_length=1,max_length=600)
+    limitation: str = Field(min_length=1,max_length=600)
+    reading_question: str = Field(min_length=1,max_length=600)
+    problem_concepts: list[str] = Field(max_length=20)
+    method_concepts: list[str] = Field(max_length=20)
+    problem_description: str = Field(max_length=600)
+    contribution_description: str = Field(max_length=600)
+    is_adjacent: bool = False
+    evidence_spans: list[EvidenceSpan] = Field(min_length=1,max_length=6)
+    coverage: Literal['abstract','partial_html'] = 'abstract'
