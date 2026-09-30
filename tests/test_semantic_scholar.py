@@ -20,6 +20,7 @@ def test_author_pagination_citation_missing_abstract_and_metrics():
     papers = source.author_papers('12345',SINCE)
     assert [p.title for p in papers] == ['New Safety Paper','New Reasoning Paper']
     assert papers[0].abstract == '' and all(p.s2_id for p in papers)
+    assert papers[0].seen_at is not None
     assert source.paper_citations('ARXIV:2605.21849',SINCE)[0].s2_id == 'citing-paper-id'
     assert source.paper_metrics(['a'])['a'].count == 0
 

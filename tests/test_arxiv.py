@@ -24,6 +24,7 @@ def test_arxiv_fresh_metadata_and_shared_throttle():
     assert [p.arxiv_id for p in papers] == ['2609.12345']
     assert papers[0].abstract and papers[0].authors == ['A Researcher']
     assert papers[0].published_at.utcoffset().total_seconds() == 0
+    assert papers[0].seen_at == datetime(2026,9,30,tzinfo=timezone.utc)
     assert requests == [0, 3]
 
 

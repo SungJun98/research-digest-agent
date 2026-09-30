@@ -61,7 +61,7 @@ def parse_scholar_message(raw: bytes, received_at: datetime) -> list[Paper]:
         if url in seen: continue
         seen.add(url)
         parsed = urlparse(url)
-        result.append(Paper(title=title,abstract=abstract,url=url,first_seen_at=received_at,sources={'scholar_mail'},
+        result.append(Paper(title=title,abstract=abstract,url=url,seen_at=received_at,sources={'scholar_mail'},
             arxiv_id=url if parsed.hostname in {'arxiv.org','www.arxiv.org'} else None,
             doi=url if parsed.hostname in {'doi.org','dx.doi.org'} else None,
             metadata={'scholar_subject': str(message['subject'] or '')}))

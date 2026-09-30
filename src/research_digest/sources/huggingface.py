@@ -27,7 +27,7 @@ class HuggingFaceSource:
                     result.append(Paper(arxiv_id=paper['id'], title=paper['title'], abstract=paper.get('summary') or '',
                         authors=[a['name'] for a in paper.get('authors', []) if a.get('name')],
                         url=f"https://huggingface.co/papers/{paper['id']}", published_at=paper.get('publishedAt'),
-                        first_seen_at=posted, sources={'huggingface'}, signals=signals,
+                        seen_at=posted, sources={'huggingface'}, signals=signals,
                         metadata={'hf_posted_date': posted[:10], 'hf_url': f"https://huggingface.co/papers/{paper['id']}"}))
             except (KeyError, ValueError, TypeError, AttributeError):
                 raise SourceError('Hugging Face: invalid response') from None

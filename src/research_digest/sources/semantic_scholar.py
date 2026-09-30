@@ -39,7 +39,7 @@ class SemanticScholarSource:
                 authors=[a['name'] for a in data.get('authors',[]) if a.get('name')],
                 url=data.get('url') or f"https://www.semanticscholar.org/paper/{data['paperId']}",
                 published_at=published+'T00:00:00Z' if published else None,
-                first_seen_at=datetime.now(timezone.utc),sources={'semantic_scholar'},
+                seen_at=datetime.now(timezone.utc),sources={'semantic_scholar'},
                 signals={'s2_citations':data['citationCount']} if isinstance(data.get('citationCount'),int) and data['citationCount'] >= 0 else {})
         except (KeyError,TypeError,ValueError):
             raise SourceError('Semantic Scholar: invalid paper') from None

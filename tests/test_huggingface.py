@@ -16,6 +16,7 @@ def test_observed_zero_unknown_and_date_pagination():
     assert papers[0].signals['hf_upvotes'] == 0
     assert papers[0].signals['hf_daily_rank'] == 1
     assert papers[0].metadata['hf_posted_date'] == '2026-09-30'
+    assert papers[0].seen_at is not None
     assert 'hf_upvotes' not in papers[1].signals
     assert papers[0].authors == ['A Researcher']
 
