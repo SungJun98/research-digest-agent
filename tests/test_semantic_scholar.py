@@ -35,3 +35,11 @@ def test_s2_retry_empty_unavailable_and_page_bound():
     with pytest.raises(SourceError): source.paper_citations('bad',SINCE)
     source = SemanticScholarSource(httpx.Client(transport=httpx.MockTransport(lambda _:httpx.Response(200,json={'data':[{'paperId':'a','title':'P'}],'next':100}))),None,interval=0,max_pages=1)
     with pytest.raises(SourceError,match='page limit'): source.author_papers('1',SINCE)
+
+
+@pytest.mark.parametrize('item',[None,123,{'paperId':'x','title':'P','authors':[None]}])
+def test_s2_malformed_paper_is_source_error(item):
+    from research_digest.sources.semantic_scholar import SemanticScholarSource
+    from research_digest.sources import SourceError
+    source=SemanticScholarSource(httpx.Client(transport=httpx.MockTransport(lambda _:httpx.Response(200,json={'data':[item]}))),None,interval=0)
+    with pytest.raises(SourceError):source.author_papers('1',SINCE)

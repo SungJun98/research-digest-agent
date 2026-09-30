@@ -58,7 +58,7 @@ class Evaluator:
                 raw=response.json()['choices'][0]['message']['content']
                 if not isinstance(raw,str) or len(raw)>100_000: raise ValueError()
                 return json.loads(raw),key
-            except (httpx.HTTPError,KeyError,ValueError,TypeError):
+            except (httpx.HTTPError,KeyError,ValueError,TypeError,IndexError):
                 raise InvalidEvaluation('LLM provider returned an invalid response') from None
         raise InvalidEvaluation('LLM provider unavailable')
 

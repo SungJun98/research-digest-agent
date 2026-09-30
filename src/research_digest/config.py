@@ -154,13 +154,27 @@ class FeedbackConfig(StrictModel):
     min_explicit_signals: int = Field(default=3, ge=3)
 
 
-class PaperWatch(StrictModel):
+class BaseWatch(StrictModel):
     id: str = Field(min_length=1)
     policy: Policy = 'next_digest'
 
 
-class AuthorWatch(PaperWatch):
+class PaperWatch(BaseWatch):
+    @field_validator('id')
+    @classmethod
+    def stable_paper_id(cls,value):
+        from .identity import normalize_watch_id
+        return normalize_watch_id('paper',value)
+
+
+class AuthorWatch(BaseWatch):
     topic_filter: bool = True
+
+    @field_validator('id')
+    @classmethod
+    def stable_author_id(cls,value):
+        from .identity import normalize_watch_id
+        return normalize_watch_id('author',value)
 
 
 class Watchlist(StrictModel):

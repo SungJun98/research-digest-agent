@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS seen(id TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS paper_delivery(paper_id TEXT, channel TEXT, notification_id TEXT, PRIMARY KEY(paper_id,channel));
 CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, subject TEXT, body TEXT, paper_ids TEXT, event_ids TEXT, local_day TEXT, kind TEXT);
 CREATE TABLE IF NOT EXISTS deliveries(notification_id TEXT, channel TEXT, status TEXT DEFAULT 'pending', lease_until REAL DEFAULT 0, PRIMARY KEY(notification_id,channel));
+CREATE TABLE IF NOT EXISTS delivery_units(notification_id TEXT, channel TEXT, unit TEXT, PRIMARY KEY(notification_id,channel,unit));
 CREATE TABLE IF NOT EXISTS runs(kind TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS watch_cursors(id TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS watch_items(subject TEXT, item TEXT, PRIMARY KEY(subject,item));
@@ -71,26 +72,43 @@ class Store:
     def upsert_papers(self, papers: list[Paper]) -> None:
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
-            for paper in merge_papers(papers):
-                known = set()
-                for alias in aliases(paper):
-                    row = db.execute('SELECT paper_id FROM aliases WHERE alias=?', (alias,)).fetchone()
-                    if row:
-                        known.add(row[0])
-                root = sorted(known)[0] if known else paper.canonical_id
-                combined = paper
-                for old in sorted(known):
-                    row = db.execute('SELECT data FROM papers WHERE id=?', (old,)).fetchone()
-                    if row:
-                        combined = merge_pair(Paper.model_validate_json(row[0]), combined)
-                    if old != root:
-                        db.execute('INSERT OR IGNORE INTO paper_delivery SELECT ?,channel,notification_id FROM paper_delivery WHERE paper_id=?', (root, old))
-                        db.execute('DELETE FROM paper_delivery WHERE paper_id=?', (old,))
-                        db.execute('UPDATE aliases SET paper_id=? WHERE paper_id=?', (root, old))
-                        db.execute('DELETE FROM papers WHERE id=?', (old,))
-                db.execute('INSERT OR REPLACE INTO papers VALUES(?,?)', (root, combined.model_dump_json()))
-                for alias in aliases(combined) | aliases(paper):
-                    db.execute('INSERT OR REPLACE INTO aliases VALUES(?,?)', (alias, root))
+            self._upsert_papers(db,papers)
+
+    def ingest_mail(self, key: str, papers: list[Paper]) -> None:
+        """Save candidates and acknowledge their UID in one transaction."""
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            self._upsert_papers(db,papers)
+            db.execute('INSERT OR IGNORE INTO seen VALUES(?)',(key,))
+
+    def _upsert_papers(self, db, papers):
+        for paper in merge_papers(papers):
+            known = set()
+            for alias in aliases(paper):
+                row = db.execute('SELECT paper_id FROM aliases WHERE alias=?', (alias,)).fetchone()
+                if row:
+                    known.add(row[0])
+            root = sorted(known)[0] if known else paper.canonical_id
+            combined = paper
+            for old in sorted(known):
+                row = db.execute('SELECT data FROM papers WHERE id=?', (old,)).fetchone()
+                if row:
+                    combined = merge_pair(Paper.model_validate_json(row[0]), combined)
+                if old != root:
+                    db.execute('INSERT OR IGNORE INTO paper_delivery SELECT ?,channel,notification_id FROM paper_delivery WHERE paper_id=?', (root, old))
+                    db.execute('DELETE FROM paper_delivery WHERE paper_id=?', (old,))
+                    db.execute('INSERT OR IGNORE INTO watch_items SELECT subject,? FROM watch_items WHERE item=?', (root, old))
+                    db.execute('DELETE FROM watch_items WHERE item=?', (old,))
+                    latest = db.execute('SELECT kind,topic_id,at FROM feedback WHERE paper_id IN (?,?) ORDER BY at DESC LIMIT 1', (root, old)).fetchone()
+                    if latest:
+                        db.execute('INSERT OR REPLACE INTO feedback VALUES(?,?,?,?)', (root, *latest))
+                    db.execute('DELETE FROM feedback WHERE paper_id=?', (old,))
+                    db.execute('UPDATE aliases SET paper_id=? WHERE paper_id=?', (root, old))
+                    db.execute('DELETE FROM papers WHERE id=?', (old,))
+            db.execute('INSERT OR REPLACE INTO papers VALUES(?,?)', (root, combined.model_dump_json()))
+            for alias in aliases(combined) | aliases(paper):
+                db.execute('INSERT OR REPLACE INTO aliases VALUES(?,?)', (alias, root))
+
 
     def list_papers(self) -> list[Paper]:
         with self.connection() as db:
@@ -147,6 +165,19 @@ class Store:
                 result.append(Notification(row['id'], row['subject'], row['body'], channels, json.loads(row['paper_ids']), json.loads(row['event_ids']), row['local_day'], row['kind']))
             return result
 
+    def pending_paper_ids(self, channel: str) -> set[str]:
+        with self.connection() as db:
+            rows = db.execute("SELECT n.paper_ids FROM notifications n JOIN deliveries d ON n.id=d.notification_id WHERE d.channel=? AND d.status!='delivered'", (channel,))
+            return {self._resolve(db,paper_id) for row in rows for paper_id in json.loads(row[0])}
+
+    def delivery_unit_done(self, key: str, channel: str, unit: str) -> bool:
+        with self.connection() as db:
+            return db.execute('SELECT 1 FROM delivery_units WHERE notification_id=? AND channel=? AND unit=?',(key,channel,unit)).fetchone() is not None
+
+    def mark_delivery_unit(self, key: str, channel: str, unit: str) -> None:
+        with self.connection() as db:
+            db.execute('INSERT OR IGNORE INTO delivery_units VALUES(?,?,?)',(key,channel,unit))
+
     def reserve_delivery(self, key: str, channel: str, now: float | None = None) -> bool:
         now = time.time() if now is None else now
         with self.connection() as db:
@@ -201,11 +232,11 @@ class Store:
 
     def watch_item_seen(self, subject: str, item: str) -> bool:
         with self.connection() as db:
-            return db.execute('SELECT 1 FROM watch_items WHERE subject=? AND item=?', (subject, item)).fetchone() is not None
+            return db.execute('SELECT 1 FROM watch_items WHERE subject=? AND item=?', (subject, self._resolve(db,item))).fetchone() is not None
 
     def mark_watch_item_seen(self, subject: str, item: str) -> None:
         with self.connection() as db:
-            db.execute('INSERT OR IGNORE INTO watch_items VALUES(?,?)', (subject, item))
+            db.execute('INSERT OR IGNORE INTO watch_items VALUES(?,?)', (subject, self._resolve(db,item)))
 
     def queue_event(self, key: str, event) -> None:
         data = event.model_dump_json() if hasattr(event, 'model_dump_json') else json.dumps(event)
@@ -253,6 +284,6 @@ class Store:
             return [dict(r) for r in db.execute('SELECT * FROM feedback ORDER BY at')]
 
     def snapshot_counts(self, exclude: set[str] | None = None) -> dict[str, int]:
-        tables = ['papers', 'seen', 'paper_delivery', 'notifications', 'deliveries', 'runs', 'watch_cursors', 'watch_items', 'events', 'cache', 'llm_usage', 'feedback']
+        tables = ['papers', 'seen', 'paper_delivery', 'notifications', 'deliveries', 'delivery_units', 'runs', 'watch_cursors', 'watch_items', 'events', 'cache', 'llm_usage', 'feedback']
         with self.connection() as db:
             return {t: db.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0] for t in tables if t not in (exclude or set())}

@@ -81,12 +81,19 @@ class ScholarMailSource:
             if status != 'OK': raise ValueError()
             _, validity = connection.response('UIDVALIDITY')
             validity = (validity or [b'unknown'])[0].decode()
-            status,data = connection.uid('search',None,'SINCE',since.strftime('%d-%b-%Y'))
-            if status != 'OK': raise ValueError()
+            uids=set()
+            for sender in sorted(allowed_senders):
+                if re.search(r'[\r\n"]',sender): raise ValueError()
+                status,data = connection.uid('search',None,'SINCE',since.strftime('%d-%b-%Y'),'FROM',f'"{sender}"')
+                if status != 'OK': raise ValueError()
+                uids.update((data[0] or b'').split())
             result = []
-            for uid in (data[0] or b'').split()[-self.max_messages:]:
+            attempted=0
+            for uid in sorted(uids,key=int):
                 key = f'imap:{self.account}:{self.mailbox}:{validity}:{uid.decode()}'
                 if self.store and self.store.seen(key): continue
+                if attempted>=self.max_messages:break
+                attempted+=1
                 status,data = connection.uid('fetch',uid,'(BODY.PEEK[] INTERNALDATE)')
                 if status != 'OK': continue
                 for row in data:
@@ -96,10 +103,11 @@ class ScholarMailSource:
                     received = datetime.strptime(match[1].decode(),'%d-%b-%Y %H:%M:%S %z').astimezone(timezone.utc)
                     message = BytesParser(policy=policy.default).parsebytes(row[1])
                     sender = parseaddr(message['from'] or '')[1].lower()
-                    if received >= since and sender in {s.lower() for s in allowed_senders}:
-                        result.extend(parse_scholar_message(row[1],received))
+                    parsed = parse_scholar_message(row[1],received) if received >= since and sender in {s.lower() for s in allowed_senders} else []
+                    result.extend(parsed)
                     if mark_fetched and self.store:
-                        self.store.mark_seen(key)
+                        for paper in parsed:paper.metadata['digest_discovered_at']=received.isoformat()
+                        self.store.ingest_mail(key,parsed)
             return result
         except Exception as error:
             if isinstance(error,SourceError): raise

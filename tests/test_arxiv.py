@@ -40,3 +40,13 @@ def test_arxiv_retries_and_malformed_response():
     with pytest.raises(SourceError, match='arXiv'):
         source.fetch(['cat:cs.AI'], datetime(2026, 1, 1, tzinfo=timezone.utc))
     assert len(calls) == 3
+
+
+def test_arxiv_doi_connects_doi_only_copy():
+    from research_digest.sources.arxiv import ArxivSource,RateLimiter
+    from research_digest.models import Paper
+    from research_digest.identity import merge_papers
+    fixture=Path('tests/fixtures/arxiv.xml').read_text().replace('<feed xmlns="http://www.w3.org/2005/Atom">','<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">').replace('<title>Reliable reasoning</title>','<title>Reliable reasoning</title><arxiv:doi>10.1234/abc</arxiv:doi>')
+    source=ArxivSource(httpx.Client(transport=httpx.MockTransport(lambda _:httpx.Response(200,text=fixture))),limiter=RateLimiter(0))
+    paper=source.fetch(['cat:cs.AI'],datetime(2026,9,29,tzinfo=timezone.utc))[0]
+    assert len(merge_papers([paper,Paper(title='Publisher title',doi='10.1234/abc')]))==1

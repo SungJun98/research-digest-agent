@@ -84,3 +84,19 @@ def merge_papers(papers: Iterable[Paper]) -> list[Paper]:
             paper = merge_pair(paper, other)
         merged.append(paper)
     return merged
+
+
+ARXIV_ID = re.compile(r'^(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?/\d{7})(?:v\d+)?$',re.I)
+
+
+def normalize_watch_id(kind: str, value: str) -> str:
+    value=value.strip()
+    if kind=='author' and re.fullmatch(r'[1-9]\d*',value):return value
+    if kind=='paper':
+        arxiv=normalize_arxiv(value)
+        if ARXIV_ID.fullmatch(arxiv):return 'ARXIV:'+arxiv
+        doi=normalize_doi(value)
+        if re.fullmatch(r'10\.\d{4,9}/\S+',doi):return 'DOI:'+doi
+        s2=value.lower().removeprefix('s2:')
+        if re.fullmatch(r'[a-f0-9]{40}',s2):return s2
+    raise ValueError('invalid stable watch ID')

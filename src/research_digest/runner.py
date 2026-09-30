@@ -87,16 +87,21 @@ class Runner:
             try:candidates.extend(source.fetch(since,preview=preview))
             except SourceError:failures[source.name]='source unavailable'
         if not preview:
+            for paper in candidates:
+                paper.metadata['digest_discovered_at']=now.isoformat()
             self.store.upsert_papers(candidates)
             for paper in self.store.list_papers():
-                freshness=paper.seen_at or paper.published_at
+                discovered=paper.metadata.get('digest_discovered_at')
+                try:freshness=datetime.fromisoformat(discovered) if discovered else None
+                except (TypeError,ValueError):freshness=None
                 if freshness and freshness>=since:candidates.append(paper)
         return merge_papers(candidates),failures
 
     def _pipeline(self,papers,now,warnings):
         channels=self._channels()
         if channels:
-            papers=[p for p in papers if not all(self.store.paper_delivered(p.canonical_id,c) for c in channels)]
+            pending={c:self.store.pending_paper_ids(c) for c in channels}
+            papers=[p for p in papers if not all(self.store.paper_delivered(p.canonical_id,c) or self.store.resolve(p.canonical_id) in pending[c] for c in channels)]
         batch=self.retriever.shortlist(papers,self.config.profile.topics)
         if batch.truncated:warnings.append(f'{batch.total_candidates} candidates shortlisted to {len(batch.papers)}; unevaluated papers are omitted')
         if 'embedding_failed' in batch.retrieval_mode:warnings.append('Embeddings unavailable; using source queries and categories')
@@ -153,9 +158,17 @@ class Runner:
 
     def _drain(self):
         combined=DeliveryReport();days=set()
-        for notification in self.store.pending_notifications():
+        local_day=self.clock().astimezone(ZoneInfo(self.config.schedule.timezone)).date().isoformat()
+        pending=self.store.pending_notifications()
+        covered=self.store.last_success('digest_covered_day')
+        allowed_day=self.store.last_success('digest_covered_payload') if covered==local_day else next((n.local_day for n in pending if n.kind=='digest'),None)
+        for notification in pending:
+            if notification.kind=='digest' and notification.local_day!=allowed_day:continue
             result=self.dispatcher.send(notification.id,notification.subject,notification.body,notification.pending_channels)
             combined.delivered.extend(result.delivered);combined.failed.update(result.failed)
+            if notification.kind=='digest' and result.delivered:
+                self.store.set_last_success('digest_covered_day',local_day)
+                self.store.set_last_success('digest_covered_payload',notification.local_day)
             if notification.kind=='digest' and notification.local_day:days.add(notification.local_day)
         for day in sorted(days):
             if self._digest_complete(day):
@@ -171,6 +184,8 @@ class Runner:
             if self._digest_complete(day):
                 self.store.set_last_success('digest',day)
                 return RunReport('digest',delivery=delivery)
+            covered=self.store.last_success('digest_covered_day')
+            if covered and covered>=day:return RunReport('digest',delivery=delivery)
             if any(n.kind=='digest' for n in self.store.pending_notifications()):return RunReport('digest',delivery=delivery)
             now=self.clock();warnings=[]
             papers,failures=self._collect(now)
@@ -185,9 +200,10 @@ class Runner:
             if not channels:return RunReport('digest',{'channels':'no notification channels enabled'},delivery)
             entries=[]
             for channel in channels:
-                chosen=[i for i in selection.selected if not self.store.paper_delivered(i.paper.canonical_id,channel)]
+                owned=self.store.pending_paper_ids(channel)
+                chosen=[i for i in selection.selected if not self.store.paper_delivered(i.paper.canonical_id,channel) and self.store.resolve(i.paper.canonical_id) not in owned]
                 ids={self.store.resolve(i.paper.canonical_id) for i in chosen}
-                pending=[e for e in events if not self.store.paper_delivered(e.paper.canonical_id,channel)]
+                pending=[e for e in events if not self.store.paper_delivered(e.paper.canonical_id,channel) and self.store.resolve(e.paper.canonical_id) not in owned]
                 unique={}
                 for event in pending:
                     root=self.store.resolve(event.paper.canonical_id)
@@ -222,7 +238,7 @@ class Runner:
             immediate,_=route_events(list(unique.values()),self.config.notifications,self.store,now,set(),timezone_name=self.config.schedule.timezone)
             day=now.astimezone(ZoneInfo(self.config.schedule.timezone)).date().isoformat()
             for event in immediate:
-                missing=[c for c in channels if not self.store.paper_delivered(event.paper.canonical_id,c)]
+                missing=[c for c in channels if not self.store.paper_delivered(event.paper.canonical_id,c) and self.store.resolve(event.paper.canonical_id) not in self.store.pending_paper_ids(c)]
                 if not missing:continue
                 related=[e.id for e in events if self.store.resolve(e.paper.canonical_id)==self.store.resolve(event.paper.canonical_id)]
                 self.store.create_notification('event:'+event.id,'Research follow-up',render_event(event,self.config.profile.summary_language,self.config.notifications.max_chars_per_paper),missing,[event.paper.canonical_id],related,day,'immediate')
@@ -233,6 +249,8 @@ class Runner:
     def tick(self,now):
         reports=[]
         last=self.store.last_success('digest')
+        covered=self.store.last_success('digest_covered_day')
+        last=max(value for value in [last,covered] if value) if last or covered else None
         day=due_digest(now,self.config.schedule.timezone,self.config.schedule.digest_at,date.fromisoformat(last) if last else None)
         if day:
             local=now.astimezone(ZoneInfo(self.config.schedule.timezone))

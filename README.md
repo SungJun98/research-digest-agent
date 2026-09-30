@@ -35,7 +35,7 @@ research-digest run --once
 research-digest serve
 ```
 
-`serve` must remain running on an awake host. It reloads configuration each minute, sends the digest at 09:00 in the selected IANA time zone, and polls watches hourly by default. A restart produces one current-day catch-up digest, not every missed day. The tool does not install a background service for you.
+`serve` must remain running on an awake host. It reloads configuration each minute, sends the digest at 09:00 in the selected IANA time zone, and polls watches hourly by default. A restart produces one catch-up digest, not every missed day. An older saved failed digest uses that day’s digest slot; fresh picks resume the next day. The tool does not install a background service for you.
 
 Live preview can call the LLM, consume your daily request quota and write caches. It does not send notifications or change delivery records, mail UIDs, watch state, feedback, configuration or last-run dates.
 
@@ -92,7 +92,7 @@ Markdown is enabled by default at `~/.local/share/research-digest/digests`. Emai
 
 The private SQLite file is at `~/.local/share/research-digest/state.db`. Payloads are saved before delivery, with each channel's success recorded independently. A restart retries the original failed payload, without resending successful channels. A daily digest is complete only when all its configured channels succeed. An unfinished daily outbox delays later daily digests to keep the backlog bounded; restore its transport before removing that channel from configuration.
 
-SMTP/webhooks cannot provide exactly-once delivery: a crash or timeout after remote acceptance but before the local success record can cause a duplicate. Chunked webhooks may repeat a successful early chunk after a later chunk fails. Markdown writes are atomic.
+SMTP/webhooks cannot provide exactly-once delivery: a crash or timeout after remote acceptance but before the local success record can cause a duplicate. Completed webhook chunks and SMTP recipients are saved individually and skipped on ordinary retry/restart. Only the remote-acceptance/local-record crash window remains. Markdown writes are atomic.
 
 ## Explicit feedback
 

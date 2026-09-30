@@ -57,3 +57,20 @@ def test_budget_cache_and_latest_explicit_feedback(tmp_path):
     assert reopened.get_cache('embedding', 'k')['vector'] == [0.2, 0.8]
     assert reopened.list_feedback()[0]['kind'] == 'not_relevant'
     assert len(reopened.list_feedback()) == 1
+
+
+def test_alias_root_merge_preserves_watch_and_latest_feedback(tmp_path):
+    from datetime import datetime,timezone,timedelta
+    from research_digest.models import Paper
+    from research_digest.store import Store
+    store=Store(tmp_path/'state.db')
+    now=datetime(2026,9,30,tzinfo=timezone.utc)
+    store.upsert_papers([Paper(title='A',arxiv_id='2609.12345'),Paper(title='B',s2_id='a'*40)])
+    store.mark_watch_item_seen('author:123','s2:'+'a'*40)
+    store.record_feedback('arxiv:2609.12345','useful','safety',now)
+    store.record_feedback('s2:'+'a'*40,'not_relevant','safety',now+timedelta(seconds=1))
+    store.upsert_papers([Paper(title='A',arxiv_id='2609.12345',s2_id='a'*40)])
+    root=store.resolve('s2:'+'a'*40)
+    assert store.watch_item_seen('author:123',root)
+    records=store.list_feedback()
+    assert len(records)==1 and records[0]['kind']=='not_relevant' and records[0]['paper_id']==root

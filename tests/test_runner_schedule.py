@@ -132,3 +132,55 @@ def test_total_evaluation_failure_is_retryable_not_empty_success(tmp_path):
     report=runner.run_digest(date(2026,9,30))
     assert report.source_failures.get('evaluation')
     assert not transport.sent and store.last_success('digest') is None
+
+
+def test_preview_exposes_candidate_scores_and_rejection_reasons(tmp_path):
+    import yaml
+    from typer.testing import CliRunner
+    from research_digest.cli import app
+    from research_digest.config import write_initial_config
+    path=tmp_path/'config.yaml';write_initial_config(path,{})
+    raw=yaml.safe_load(path.read_text());raw['selection']['unknown_attention_min']=5;path.write_text(yaml.safe_dump(raw))
+    result=CliRunner().invoke(app,['preview','--config',str(path),'--offline-fixtures'])
+    assert result.exit_code==0
+    assert 'arxiv:2609.99001' in result.output and 'unknown attention' in result.output and '4.00' in result.output
+
+
+def test_watch_baseline_catalog_is_not_daily_discovery(tmp_path):
+    from research_digest.watch import WatchService
+    from research_digest.config import Watchlist,AuthorWatch
+    runner,store,_,evaluator=setup(tmp_path)
+    historical=Paper(title='Historical 2016 work',abstract='Old work',s2_id='a'*40,published_at=datetime(2016,1,1,tzinfo=timezone.utc),seen_at=NOW)
+    class Catalog:
+        def author_papers(self,author_id,since):return [historical]
+    watch=WatchService(Catalog(),store,evaluator)
+    assert watch.scan(Watchlist(authors=[AuthorWatch(id='123')]),NOW)==[]
+    papers,_=runner._collect(NOW)
+    assert historical.canonical_id not in {p.canonical_id for p in papers}
+    assert store.get_paper(historical.canonical_id) is not None
+
+
+def test_pending_immediate_and_digest_share_one_delivery_per_paper_channel(tmp_path):
+    runner,store,transport,_=setup(tmp_path)
+    p=Source().fetch(NOW)[0]
+    store.upsert_papers([p])
+    store.create_notification('event:old','Immediate','WATCH '+p.canonical_id,['markdown'],[p.canonical_id],kind='immediate',local_day='2026-09-29')
+    original=transport.send
+    def fail_immediate(subject,body):
+        if subject=='Immediate':raise RuntimeError('temporarily unavailable')
+        original(subject,body)
+    transport.send=fail_immediate
+    runner.run_digest(date(2026,9,30))
+    assert all(p.canonical_id not in body for body in transport.sent)
+    transport.send=original
+    runner.run_watch()
+    assert sum(p.canonical_id in body for body in transport.sent)==1
+
+
+def test_recovered_old_digest_consumes_todays_digest_slot(tmp_path):
+    runner,store,transport,_=setup(tmp_path)
+    store.create_notification('old','Old digest','Old body',['markdown'],local_day='2026-09-25',kind='digest')
+    runner.tick(NOW)
+    runner.tick(NOW+timedelta(minutes=1))
+    assert transport.sent==['Old body']
+    assert store.last_success('digest_covered_day')=='2026-09-30'

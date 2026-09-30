@@ -46,3 +46,40 @@ def test_old_untrusted_uid_and_preview(tmp_path):
     assert stale.fetch(NOW,allowed) == []
     spoof = ScholarMailSource(lambda:FakeIMAP(raw=RAW.replace(b'scholaralerts-noreply@google.com',b'other@example.com')))
     assert spoof.fetch(NOW,allowed) == []
+
+
+def test_later_imap_failure_preserves_earlier_uid_candidates(tmp_path):
+    from research_digest.sources.scholar_mail import ScholarMailSource
+    from research_digest.store import Store
+    from research_digest.sources import SourceError
+    import pytest
+    class FailureAfterFirst(FakeIMAP):
+        def uid(self,command,*args):
+            if command=='search':return 'OK',[b'101 102']
+            if args[0]==b'102':raise OSError('IMAP disconnected')
+            return super().uid(command,*args)
+    store=Store(tmp_path/'state.db')
+    source=ScholarMailSource(lambda:FailureAfterFirst(),store)
+    with pytest.raises(SourceError):source.fetch(NOW,{'scholaralerts-noreply@google.com'})
+    assert len(store.list_papers())==2
+    assert store.seen('imap:default:INBOX:42:101')
+    assert all(p.metadata.get('digest_discovered_at') for p in store.list_papers())
+
+
+def test_processed_uids_do_not_starve_older_scholar_mail(tmp_path):
+    from research_digest.sources.scholar_mail import ScholarMailSource
+    from research_digest.store import Store
+    class Paged(FakeIMAP):
+        def uid(self,command,*args):
+            if command=='search':
+                self.calls.append((command,args))
+                return 'OK',[b'101 102 103']
+            return super().uid(command,*args)
+    store=Store(tmp_path/'state.db');imap=Paged()
+    store.mark_seen('imap:default:INBOX:42:103')
+    source=ScholarMailSource(lambda:imap,store,max_messages=1)
+    assert len(source.fetch(NOW,{'scholaralerts-noreply@google.com'}))==2
+    assert store.seen('imap:default:INBOX:42:101')
+    assert any('FROM' in str(args) for command,args in imap.calls if command=='search')
+    source.fetch(NOW,{'scholaralerts-noreply@google.com'})
+    assert store.seen('imap:default:INBOX:42:102')

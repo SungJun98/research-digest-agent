@@ -58,3 +58,12 @@ def test_doctor_never_prints_secret(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ['doctor', '--config', str(path)])
     assert result.exit_code == 0
     assert 'never-print-me' not in result.stdout
+
+
+def test_yaml_watch_ids_are_normalized_and_names_rejected():
+    from research_digest.config import AppConfig
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):AppConfig.model_validate({'watchlist':{'authors':[{'id':'John Doe'}]}})
+    with pytest.raises(ValidationError):AppConfig.model_validate({'watchlist':{'papers':[{'id':'arbitrary paper title'}]}})
+    cfg=AppConfig.model_validate({'watchlist':{'papers':[{'id':'https://arxiv.org/abs/2605.21849v2'}],'authors':[{'id':'12345'}]}})
+    assert cfg.watchlist.papers[0].id=='ARXIV:2605.21849'

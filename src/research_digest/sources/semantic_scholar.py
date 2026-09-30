@@ -32,11 +32,15 @@ class SemanticScholarSource:
     @staticmethod
     def _paper(data):
         try:
+            if not isinstance(data,dict): raise ValueError()
             external = data.get('externalIds') or {}
+            if not isinstance(external,dict): raise ValueError()
+            authors = data.get('authors') or []
+            if not isinstance(authors,list) or any(not isinstance(a,dict) for a in authors): raise ValueError()
             published = data.get('publicationDate')
             return Paper(s2_id=data['paperId'],doi=external.get('DOI'),arxiv_id=external.get('ArXiv'),
                 title=data['title'],abstract=data.get('abstract') or '',
-                authors=[a['name'] for a in data.get('authors',[]) if a.get('name')],
+                authors=[a['name'] for a in authors if a.get('name')],
                 url=data.get('url') or f"https://www.semanticscholar.org/paper/{data['paperId']}",
                 published_at=published+'T00:00:00Z' if published else None,
                 seen_at=datetime.now(timezone.utc),sources={'semantic_scholar'},
@@ -50,6 +54,7 @@ class SemanticScholarSource:
             data = self._get(path,{'fields':FIELDS,'offset':offset,'limit':100})
             if not isinstance(data.get('data'),list): raise SourceError('Semantic Scholar: invalid page')
             for item in data['data']:
+                if not isinstance(item,dict): raise SourceError('Semantic Scholar: invalid paper')
                 paper = self._paper(item.get('citingPaper',{}) if wrapped else item)
                 if paper.published_at is None or paper.published_at >= since:
                     result.append(paper)

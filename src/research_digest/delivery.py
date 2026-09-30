@@ -36,12 +36,17 @@ class Dispatcher:
         if not notification:return report
         for channel in notification.pending_channels:
             if not self.store.reserve_delivery(notification_id,channel):continue
+            if notification.paper_ids and all(self.store.paper_delivered(p,channel) for p in notification.paper_ids):
+                self.store.mark_delivered(notification_id,channel)
+                continue
             transport=self.transports.get(channel)
             success=False
             for attempt in range(3):
                 try:
                     if transport is None:raise DeliveryError()
-                    transport.send(notification.subject,notification.body)
+                    if hasattr(transport,'send_with_state'):
+                        transport.send_with_state(self.store,notification_id,channel,notification.subject,notification.body)
+                    else:transport.send(notification.subject,notification.body)
                     success=True
                     break
                 except DeliveryError as exc:
@@ -76,11 +81,18 @@ class MarkdownTransport:
 
 class SmtpTransport:
     def __init__(self,config):self.config=config
-    def send(self,subject,body):
+    def send(self,subject,body):self._send(subject,body)
+    def send_with_state(self,store,key,channel,subject,body):self._send(subject,body,store,key,channel)
+
+    def _send(self,subject,body,store=None,key=None,channel=None):
         cfg=self.config
+        units={recipient:hashlib.sha256(recipient.encode()).hexdigest() for recipient in cfg.recipients}
+        remaining=[r for r in cfg.recipients if not store or not store.delivery_unit_done(key,channel,units[r])]
+        if not remaining:return
         message=EmailMessage()
         try:
             message['Subject']=subject;message['From']=cfg.sender;message['To']=', '.join(cfg.recipients)
+            if key:message['Message-ID']='<'+hashlib.sha256((key+channel).encode()).hexdigest()+'@research-digest.local>'
             message.set_content(body)
             context=ssl.create_default_context()
             if cfg.security=='ssl':server=smtplib.SMTP_SSL(cfg.host,cfg.port,timeout=30,context=context)
@@ -89,11 +101,16 @@ class SmtpTransport:
                 if cfg.security=='starttls':server.starttls(context=context)
                 username=os.environ.get(cfg.username_env,'') if cfg.username_env else cfg.sender
                 server.login(username,os.environ[cfg.password_env])
-                refused=server.send_message(message)
-                if refused:raise DeliveryError('SMTP recipients refused')
+                for recipient in remaining:
+                    refused=server.send_message(message,to_addrs=[recipient])
+                    if refused:
+                        codes=[details[0] for details in refused.values()]
+                        raise DeliveryError('SMTP recipient refused',retryable=all(400<=code<500 for code in codes))
+                    if store:store.mark_delivery_unit(key,channel,units[recipient])
         except DeliveryError:raise
         except (OSError,smtplib.SMTPException,ValueError,KeyError) as exc:
-            transient=isinstance(exc,OSError) or 400<=getattr(exc,'smtp_code',0)<500
+            codes=[details[0] for details in getattr(exc,'recipients',{}).values()]
+            transient=isinstance(exc,OSError) or 400<=getattr(exc,'smtp_code',0)<500 or bool(codes and all(400<=c<500 for c in codes))
             raise DeliveryError('SMTP delivery failed',retryable=transient) from None
 
 
@@ -107,12 +124,21 @@ class SlackWebhookTransport:
         except httpx.HTTPError as exc:
             status=getattr(getattr(exc,'response',None),'status_code',0)
             raise DeliveryError('webhook unavailable',retryable=status==429 or status>=500 or not status) from None
-    def send(self,subject,body):
+    def _parts(self,subject,body):
         text=f'{subject}\n\n{body}'
-        for start in range(0,len(text),35000):self._post({'text':text[start:start+35000]})
+        return [{'text':text[start:start+35000]} for start in range(0,len(text),35000)]
+    def send(self,subject,body):
+        for payload in self._parts(subject,body):self._post(payload)
+    def send_with_state(self,store,key,channel,subject,body):
+        import json
+        for index,payload in enumerate(self._parts(subject,body)):
+            unit=str(index)+':'+hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
+            if store.delivery_unit_done(key,channel,unit):continue
+            self._post(payload)
+            store.mark_delivery_unit(key,channel,unit)
 
 
 class DiscordWebhookTransport(SlackWebhookTransport):
-    def send(self,subject,body):
+    def _parts(self,subject,body):
         text=f'{subject}\n\n{body}'
-        for start in range(0,len(text),1900):self._post({'content':text[start:start+1900],'allowed_mentions':{'parse':[]}})
+        return [{'content':text[start:start+1900],'allowed_mentions':{'parse':[]}} for start in range(0,len(text),1900)]

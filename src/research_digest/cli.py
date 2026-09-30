@@ -115,6 +115,16 @@ def preview(config: Path = typer.Option(default_config_path(),'--config'), offli
         with httpx.Client() as client:report=build_runner(cfg,client).preview()
     typer.echo(report.sample_message)
     typer.echo(f'후보 검색: {report.retrieval_mode} · 평가 {len(report.scored)} · 추천 {len(report.selected)}')
+    rejected = {item.paper.canonical_id:item.reason for item in report.rejected}
+    selected = {item.paper.canonical_id for item in report.selected}
+    typer.echo('후보별 평가 (중요성/근거/적합성/관련성):')
+    for item in sorted(report.scored,key=lambda item:(-item.score,item.paper.canonical_id)):
+        ev=item.evaluation
+        status='선정' if item.paper.canonical_id in selected else rejected.get(item.paper.canonical_id,'미선정')
+        typer.echo(f'{item.paper.canonical_id} · {item.score:.2f}/5 · {ev.importance}/{ev.evidence}/{ev.fit}/{ev.relevance} · {status}')
+    assessed={item.paper.canonical_id for item in report.scored}
+    for item in report.rejected:
+        if item.paper.canonical_id not in assessed:typer.echo(f'{item.paper.canonical_id} · 평가 없음 · {item.reason}')
     for warning in report.coverage_warnings:typer.echo('누락: '+warning)
     for suggestion in report.profile_suggestions:
         typer.echo(f'설정 제안: {suggestion.topic_id or "global"}.{suggestion.field} → {suggestion.proposed_value} ({suggestion.reason})')
@@ -162,19 +172,11 @@ def serve(config: Path = typer.Option(default_config_path(),'--config')):
 
 
 def _watch_id(kind,identifier):
-    import re
-    from .identity import normalize_arxiv,normalize_doi
-    if kind=='author' and re.fullmatch(r'\d+',identifier):return identifier
-    if kind=='paper':
-        arxiv=normalize_arxiv(identifier)
-        from .sources.fulltext import ARXIV_ID
-        if ARXIV_ID.fullmatch(arxiv):return 'ARXIV:'+arxiv
-        doi=normalize_doi(identifier.removeprefix('DOI:').removeprefix('doi:'))
-        if re.fullmatch(r'10\.\d{4,9}/\S+',doi):return 'DOI:'+doi
-        s2=identifier.removeprefix('s2:')
-        if re.fullmatch(r'[a-fA-F0-9]{40}',s2):return s2.lower()
-    typer.echo('Semantic Scholar author ID 또는 arXiv/DOI/S2 paper ID를 사용하세요.',err=True)
-    raise typer.Exit(2)
+    from .identity import normalize_watch_id
+    try:return normalize_watch_id(kind,identifier)
+    except ValueError:
+        typer.echo('Semantic Scholar author ID 또는 arXiv/DOI/S2 paper ID를 사용하세요.',err=True)
+        raise typer.Exit(2) from None
 
 
 @app.command()

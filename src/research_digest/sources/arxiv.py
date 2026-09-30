@@ -39,7 +39,7 @@ class ArxivSource:
                         raise ValueError()
                     result.append(Paper(title=value('title'), abstract=value('summary'),
                         authors=[a.findtext(ATOM+'name') or '' for a in entry.findall(ATOM+'author')],
-                        url=url, arxiv_id=url, published_at=value('published'), seen_at=updated,
+                        url=url, arxiv_id=url, doi=entry.findtext('{http://arxiv.org/schemas/atom}doi'), published_at=value('published'), seen_at=updated,
                         sources={'arxiv'}, metadata={'updated_at': updated.isoformat()}))
             except (ET.ParseError, ValueError, TypeError):
                 raise SourceError('arXiv: invalid Atom response') from None

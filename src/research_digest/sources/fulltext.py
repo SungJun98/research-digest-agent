@@ -4,9 +4,9 @@ from urllib.parse import urlparse, urljoin
 import httpx
 from bs4 import BeautifulSoup
 from ..models import FulltextContext
+from ..identity import ARXIV_ID
 from . import ARXIV_LIMITER
 
-ARXIV_ID = re.compile(r'^(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?/\d{7})(?:v\d+)?$')
 MATCH = re.compile(r'introduction|results|discussion|limitations|conclusion',re.I)
 
 
