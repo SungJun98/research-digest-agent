@@ -1,0 +1,43 @@
+# Copy with `research-digest init`; private keys belong in environment variables.
+profile:
+  summary_language: ko
+  topics:
+    - id: safety
+      priority: 3
+      description: AI safety and alignment, oversight, control, risk evaluation, reward hacking and substantive preference optimization.
+      include: [AI safety, alignment, oversight, reward hacking, preference optimization]
+    - id: reasoning
+      priority: 3
+      description: Reasoning and decision-making, verification, search, reliable agents, adaptive computation and test-time scaling.
+      include: [reasoning, verification, agents, test-time scaling]
+    - id: learning
+      priority: 2
+      description: Generalization, uncertainty, probabilistic learning, transfer and distribution shift.
+      include: [generalization, uncertainty, Bayesian, distribution shift]
+    - id: interpretability
+      priority: 2
+      description: Interpretability, model behavior, causal interventions, faithful explanations and understanding failures.
+      include: [interpretability, mechanistic, faithfulness, model behavior]
+  lenses:
+    - Trustworthy decisions under uncertainty
+    - Robustness under changing conditions
+    - Efficient use of data and computation
+  exclude:
+    - Diffusion language model decoding without broader reasoning or reliability contributions
+schedule:
+  timezone: Asia/Seoul
+  digest_at: '09:00'
+  watch_poll_minutes: 60
+  catchup: true
+llm:
+  base_url: https://api.openai.com/v1
+  model: '' # Set a model your provider supports.
+  api_key_env: DIGEST_LLM_API_KEY
+  max_requests_per_day: 80
+notifications:
+  markdown:
+    enabled: true
+    directory: ~/.local/share/research-digest/digests
+  default_watch_policy: next_digest
+  max_immediate_per_day: 3
+state_path: ~/.local/share/research-digest/state.db

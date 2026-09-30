@@ -251,6 +251,20 @@ def write_initial_config(path: Path, answers: dict[str, str]) -> None:
     cfg.llm.base_url = answers.get('base_url', cfg.llm.base_url)
     if answers.get('topics'):
         cfg.profile.topics = [Topic(id=f'topic_{i+1}', description=t.strip()) for i, t in enumerate(answers['topics'].split(';')) if t.strip()]
+    if 'channels' in answers:
+        channels = {c.strip() for c in answers['channels'].split(',') if c.strip()}
+        if not channels or channels-{'email','slack','discord','markdown'}:
+            raise ValueError('invalid channels')
+        for name in ['email','slack','discord','markdown']:
+            getattr(cfg.notifications,name).enabled = name in channels
+        if 'email' in channels:
+            cfg.notifications.email.host = answers.get('smtp_host','')
+            cfg.notifications.email.sender = answers.get('smtp_sender','')
+            cfg.notifications.email.recipients = [r.strip() for r in answers.get('smtp_recipients','').split(',') if r.strip()]
+    if 'watch_policy' in answers:
+        cfg.notifications.default_watch_policy = answers['watch_policy']
+    if 'watch_poll_minutes' in answers:
+        cfg.schedule.watch_poll_minutes = int(answers['watch_poll_minutes'])
     cfg = AppConfig.model_validate(cfg.model_dump())
     path = path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -275,3 +289,21 @@ def validate_secrets(cfg: AppConfig, env: Mapping[str, str]) -> list[str]:
         if channel.enabled:
             required.append(channel.url_env)
     return sorted({name for name in required if not env.get(name)})
+
+
+def save_config(path: Path, cfg: AppConfig) -> None:
+    """Validate then atomically replace an existing private configuration."""
+    import os
+    import tempfile
+    cfg = AppConfig.model_validate(cfg.model_dump())
+    path = path.expanduser()
+    path.parent.mkdir(parents=True,exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile('w',dir=path.parent,encoding='utf-8',delete=False) as handle:
+            temporary = handle.name
+            handle.write(yaml.safe_dump(cfg.model_dump(mode='json'),allow_unicode=True,sort_keys=False))
+        os.replace(temporary,path)
+        path.chmod(0o600)
+    finally:
+        if temporary and os.path.exists(temporary):os.unlink(temporary)

@@ -129,6 +129,16 @@ class Store:
                 for channel in channels:
                     db.execute('INSERT INTO deliveries(notification_id,channel) VALUES(?,?)', (key, channel))
 
+    def create_notifications(self, entries: list[dict]) -> None:
+        """Atomically save every channel's immutable daily payload before any send."""
+        with self.connection() as db:
+            for entry in entries:
+                cursor = db.execute('INSERT OR IGNORE INTO notifications VALUES(?,?,?,?,?,?,?)',
+                    (entry['key'],entry['subject'],entry['body'],json.dumps(entry.get('paper_ids',[])),json.dumps(entry.get('event_ids',[])),entry.get('local_day'),entry.get('kind','digest')))
+                if cursor.rowcount:
+                    for channel in entry['channels']:
+                        db.execute('INSERT INTO deliveries(notification_id,channel) VALUES(?,?)',(entry['key'],channel))
+
     def pending_notifications(self) -> list[Notification]:
         with self.connection() as db:
             result = []
