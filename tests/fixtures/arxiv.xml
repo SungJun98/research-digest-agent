@@ -1,0 +1,4 @@
+<feed xmlns="http://www.w3.org/2005/Atom">
+<entry><id>http://arxiv.org/abs/2609.12345v2</id><title>Reliable reasoning</title><summary>Verification improves decision reliability.</summary><published>2026-09-29T00:00:00Z</published><updated>2026-09-30T00:00:00Z</updated><author><name>A Researcher</name></author></entry>
+<entry><id>http://arxiv.org/abs/2601.11111v1</id><title>Older paper</title><summary>Old abstract.</summary><published>2026-01-01T00:00:00Z</published><updated>2026-01-02T00:00:00Z</updated><author><name>B Researcher</name></author></entry>
+</feed>
