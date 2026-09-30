@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-digest-agent"
+version = "0.1.0"
+description = "A configurable, evidence-aware research digest and follow-up watcher"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["typer>=0.12,<1", "pydantic>=2.7,<3", "PyYAML>=6,<7", "httpx>=0.27,<1", "beautifulsoup4>=4.12,<5", "tzdata>=2024.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "build>=1,<2"]
+
+[project.scripts]
+research-digest = "research_digest.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+research_digest = ["demo/*.json", "demo/*.html"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["live: opt-in external integration checks"]
+addopts = "-m 'not live'"
