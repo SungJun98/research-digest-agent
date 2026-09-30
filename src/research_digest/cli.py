@@ -62,5 +62,26 @@ def doctor(config: Path = typer.Option(default_config_path(), '--config')):
     typer.echo('정확한 예약 실행에는 serve를 상시 실행해야 합니다.')
 
 
+@app.command()
+def feedback(paper_id: str, kind: str = typer.Option(..., '--kind'), topic: str | None = typer.Option(None, '--topic'), config: Path = typer.Option(default_config_path(), '--config')):
+    """Record explicit useful/not_relevant/already_known/weak_evidence feedback."""
+    from datetime import datetime, timezone
+    from .store import Store
+    from .feedback import FeedbackService
+    cfg = read_config(config)
+    if not cfg.feedback.enabled:
+        typer.echo('피드백 기능이 비활성화되어 있습니다.', err=True)
+        raise typer.Exit(2)
+    if topic and topic not in {t.id for t in cfg.profile.topics}:
+        typer.echo('알 수 없는 주제 ID입니다.', err=True)
+        raise typer.Exit(2)
+    try:
+        FeedbackService(Store(cfg.state_path)).record(paper_id,kind,topic,datetime.now(timezone.utc))
+    except ValueError:
+        typer.echo('논문 ID 또는 피드백 종류를 확인해 주세요.', err=True)
+        raise typer.Exit(2) from None
+    typer.echo('명시적 피드백을 저장했습니다. 설정 변경 제안은 preview에서 확인하세요.')
+
+
 if __name__ == '__main__':
     app()
