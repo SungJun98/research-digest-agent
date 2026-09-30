@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-research-digest-agent-design.md`
 
+**추천 설계 변경 안내 (2026-09-30):** [PaperFlow 참고 수정안](../specs/2026-09-30-recommendation-pipeline-design.md)이 사용자 검토 중이다. 이 수정안 승인 후 Task 1·2·7·8·10·11에 의미 검색·상위 후보 본문 확인·다양성·명시적 피드백을 반영한다. 현재 Task 7의 초록 전용 평가와 단순 주제 상한은 이전 설계이므로 그대로 구현하지 않는다. 구현은 수정안 검토 및 실행 방식 선택 후 시작한다.
+
 ## Global Constraints
 
 - Python 3.11 이상; CI는 Python 3.11·3.12에서 실행한다.
