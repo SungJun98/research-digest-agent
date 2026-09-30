@@ -59,14 +59,19 @@ def doctor(config: Path = typer.Option(default_config_path(), '--config')):
     """Check configuration and environment variable names without exposing secrets."""
     cfg = read_config(config)
     missing = validate_secrets(cfg, os.environ)
-    if missing or (cfg.llm.enabled and not cfg.llm.model):
+    if missing or (cfg.llm.enabled and cfg.llm.backend=='api' and not cfg.llm.model):
         if missing:
             typer.echo('필요한 환경변수: ' + ', '.join(missing))
-        if cfg.llm.enabled and not cfg.llm.model:
+        if cfg.llm.enabled and cfg.llm.backend=='api' and not cfg.llm.model:
             typer.echo('llm.model을 설정해 주세요.')
         raise typer.Exit(1)
+    if cfg.llm.enabled and cfg.llm.backend=='codex_cli':
+        from .codex import codex_logged_in
+        if not codex_logged_in(cfg.llm.codex_command):
+            typer.echo('Codex CLI 설치와 codex login을 확인해 주세요.')
+            raise typer.Exit(1)
     typer.echo(f'설정 확인 완료: {cfg.schedule.timezone} {cfg.schedule.digest_at:%H:%M}')
-    typer.echo('정확한 예약 실행에는 serve를 상시 실행해야 합니다.')
+    typer.echo('예약 실행에는 serve 또는 외부 스케줄러의 tick 호출이 필요합니다.')
 
 
 @app.command()
@@ -93,9 +98,62 @@ def feedback(paper_id: str, kind: str = typer.Option(..., '--kind'), topic: str 
 
 def _ready(cfg):
     missing = validate_secrets(cfg,os.environ)
-    if missing or (cfg.llm.enabled and not cfg.llm.model):
+    if missing or (cfg.llm.enabled and cfg.llm.backend=='api' and not cfg.llm.model):
         typer.echo('doctor로 모델 및 환경변수 설정을 확인해 주세요.',err=True)
         raise typer.Exit(2)
+
+
+@app.command()
+def tick(config: Path = typer.Option(default_config_path(),'--config')):
+    """Run only due digest/watch work; suitable for a recurring external scheduler."""
+    import httpx
+    from .runtime import build_runner
+    cfg=read_config(config);_ready(cfg)
+    with httpx.Client() as client:
+        runner=build_runner(cfg,client)
+        reports=runner.tick(runner.clock())
+    failed=any(report.source_failures or (report.delivery and report.delivery.failed) for report in reports)
+    typer.echo('일부 작업 미완료; 다음 실행에서 재시도합니다.' if failed else f'예약 확인 완료: {len(reports)}개 작업')
+    if failed:raise typer.Exit(1)
+
+
+@app.command()
+def outbox(claim:bool=typer.Option(False,'--claim'),config: Path = typer.Option(default_config_path(),'--config')):
+    """Export immutable pending external Slack messages as JSON without acknowledging."""
+    import json
+    from .store import Store
+    cfg=read_config(config)
+    if cfg.notifications.slack.transport!='external':
+        typer.echo('외부 Slack 전달 모드가 필요합니다.',err=True);raise typer.Exit(2)
+    store=Store(cfg.state_path)
+    messages=[dict(id=n.id,subject=n.subject,body=n.body,kind=n.kind,local_day=n.local_day)
+              for n in store.pending_notifications() if 'slack' in n.pending_channels and (not claim or store.reserve_delivery(n.id,'slack'))]
+    typer.echo(json.dumps(messages,ensure_ascii=False))
+
+
+@app.command()
+def ack(notification_id:str,message_url:str=typer.Option(...,'--message-url'),config:Path=typer.Option(default_config_path(),'--config')):
+    """Acknowledge a known external Slack payload after a confirmed send; retain its receipt."""
+    import re
+    from datetime import datetime,timezone
+    from urllib.parse import urlparse
+    from .store import Store
+    cfg=read_config(config);slack=cfg.notifications.slack
+    url=urlparse(message_url)
+    match=re.fullmatch(r'/archives/([CG][A-Z0-9]+)/p\d+',url.path)
+    host=url.hostname or ''
+    slack_host=host.endswith('.slack.com') and url.netloc==host
+    if not slack.enabled or slack.transport!='external' or url.scheme!='https' or not slack_host or not match or url.query or url.fragment or (slack.channel_id and match[1]!=slack.channel_id):
+        typer.echo('확인된 대상 Slack 메시지 링크가 필요합니다.',err=True);raise typer.Exit(2)
+    store=Store(cfg.state_path)
+    with store.connection() as db:
+        known=db.execute('SELECT status FROM deliveries WHERE notification_id=? AND channel=?',(notification_id,'slack')).fetchone()
+    if not known:
+        typer.echo('알 수 없는 알림입니다.',err=True);raise typer.Exit(2)
+    if known[0]!='delivered':
+        store.mark_delivered(notification_id,'slack')
+        store.put_cache('external_delivery_receipt',notification_id,{'message_url':message_url,'acknowledged_at':datetime.now(timezone.utc).isoformat()})
+    typer.echo('Slack 전달 완료를 기록했습니다.')
 
 
 @app.command()

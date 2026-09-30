@@ -40,6 +40,11 @@ class RunReport:
 
 def evaluate_candidates(papers,evaluator,topics,warnings=None):
     warnings=warnings if warnings is not None else []
+    if hasattr(evaluator,'evaluate_many'):
+        evaluations=evaluator.evaluate_many(papers,topics)
+        for paper in papers:
+            if paper.canonical_id not in evaluations:warnings.append(f'{paper.canonical_id}: evaluation unavailable or rejected')
+        return evaluations
     evaluations={}
     for paper in papers:
         try:evaluations[paper.canonical_id]=evaluator.evaluate(paper,topics)

@@ -35,11 +35,12 @@ class Dispatcher:
         report=DeliveryReport()
         if not notification:return report
         for channel in notification.pending_channels:
+            transport=self.transports.get(channel)
+            if getattr(transport,'external',False):continue
             if not self.store.reserve_delivery(notification_id,channel):continue
             if notification.paper_ids and all(self.store.paper_delivered(p,channel) for p in notification.paper_ids):
                 self.store.mark_delivered(notification_id,channel)
                 continue
-            transport=self.transports.get(channel)
             success=False
             for attempt in range(3):
                 try:
@@ -61,6 +62,11 @@ class Dispatcher:
                 self.store.mark_failed(notification_id,channel)
                 report.failed[channel]=f'{channel}: delivery failed; pending retry'
         return report
+
+
+class ExternalTransport:
+    """Stage an immutable outbox for a trusted connected-app sender to acknowledge."""
+    external=True
 
 
 class MarkdownTransport:

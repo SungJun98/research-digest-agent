@@ -37,6 +37,26 @@ research-digest serve
 
 `serve` must remain running on an awake host. It reloads configuration each minute, sends the digest at 09:00 in the selected IANA time zone, and polls watches hourly by default. A restart produces one catch-up digest, not every missed day. An older saved failed digest uses that day’s digest slot; fresh picks resume the next day. The tool does not install a background service for you.
 
+### Use a local Codex login
+
+You can use an installed, signed-in Codex CLI instead of an API key:
+
+```yaml
+llm:
+  backend: codex_cli
+  codex_command: codex
+  model: '' # Uses the CLI's built-in default; set a supported model to pin it.
+  codex_batch_size: 5
+```
+
+Run `codex login`, then `research-digest doctor`. The backend runs ephemeral, read-only structured assessments with shell, app, plugin, hook, browser and subagent tools disabled. It validates the same evidence spans and selection criteria as the API backend. Abstracts are assessed in batches; failed or missing batch entries are omitted without an individual retry storm. Request caps count CLI invocations, not papers. API `max_output_tokens` does not set the CLI model's output limit; response files are bounded separately. This uses your Codex account's access and limits. Never copy account credentials into this repository or public CI. See [official Codex automation documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
+
+### Deliver through a connected Slack agent
+
+For a trusted scheduler with access to the Slack plugin, set `notifications.slack.enabled: true` and `notifications.slack.transport: external`. Set `workspace_name`, `channel_name`, and the verified `channel_id` in your private configuration. This requires no webhook key; ordinary webhook delivery remains supported.
+
+The scheduler runs `research-digest tick` each hour. Only the due daily digest and watch polls run. It then uses `research-digest outbox --claim` to reserve pending Slack payloads for five minutes, sends their saved subject/body to the verified destination, and calls `research-digest ack ID --message-url CONFIRMED_SLACK_URL` only after a successful send. `outbox` without `--claim` is read-only. Authentication or send failures leave the original payload pending. The sender must preserve message receipts before acknowledging; remote acceptance before acknowledgment retains the documented at-least-once delivery boundary.
+
 Live preview can call the LLM, consume your daily request quota and write caches. It does not send notifications or change delivery records, mail UIDs, watch state, feedback, configuration or last-run dates.
 
 ## How recommendations work

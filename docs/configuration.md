@@ -4,7 +4,7 @@
 
 Descriptions/include hints drive topic retrieval and assessment. Global/topic excludes are supplied to the evaluator, without automatically excluding alignment-related preference optimization. Priorities break selection ties and control topic coverage order. Lenses affect fit reasoning; no exact keyword match is required.
 
-Each `watchlist.papers` entry has `id` and `policy`; `watchlist.authors` also has `topic_filter` (true by default). Use stable IDs accepted by `follow`. Model names are provider-specific; no model is silently selected.
+Each `watchlist.papers` entry has `id` and `policy`; `watchlist.authors` also has `topic_filter` (true by default). Use stable IDs accepted by `follow`. API model names are provider-specific and required. With `llm.backend: codex_cli`, an empty model uses the installed CLI's built-in default; set a model explicitly to pin it.
 
 | Setting | Default |
 | --- | --- |
@@ -80,21 +80,29 @@ Each `watchlist.papers` entry has `id` and `policy`; `watchlist.authors` also ha
 | `notifications.email.security` | `"starttls"` |
 | `notifications.slack.enabled` | `false` |
 | `notifications.slack.url_env` | `"DIGEST_SLACK_WEBHOOK"` |
+| `notifications.slack.transport` | `"webhook"` |
+| `notifications.slack.workspace_name` | `""` |
+| `notifications.slack.channel_name` | `""` |
+| `notifications.slack.channel_id` | `null` |
 | `notifications.discord.enabled` | `false` |
 | `notifications.discord.url_env` | `"DIGEST_DISCORD_WEBHOOK"` |
 | `notifications.markdown.enabled` | `true` |
 | `notifications.markdown.directory` | `"~/.local/share/research-digest/digests"` |
 | `llm.enabled` | `true` |
+| `llm.backend` | `"api"` |
 | `llm.base_url` | `"https://api.openai.com/v1"` |
 | `llm.model` | `""` |
+| `llm.codex_command` | `"codex"` |
+| `llm.codex_timeout_seconds` | `240` |
+| `llm.codex_batch_size` | `5` |
 | `llm.api_key_env` | `"DIGEST_LLM_API_KEY"` |
 | `llm.max_requests_per_day` | `80` |
 | `llm.max_output_tokens` | `1800` |
 | `llm.json_mode` | `true` |
 | `state_path` | `"~/.local/share/research-digest/state.db"` |
 
-Channel details: email supports `starttls`/`ssl`, optional `username_env`, and required sender/recipients/host when enabled. Webhooks use `url_env`. Markdown uses a directory. Enabling a remote channel adds its secret variable to `doctor` checks. S2 API key is optional, but unauthenticated requests may be limited.
+Channel details: email supports `starttls`/`ssl`, optional `username_env`, and required sender/recipients/host when enabled. Webhooks use `url_env`. Markdown uses a directory. External Slack delivery uses a trusted connected-app sender and adds no webhook secret. Its workspace/channel metadata belong in private config. `outbox --claim` leases messages for five minutes; `ack` requires a confirmed Slack permalink and rejects a different configured channel. S2 API key is optional, but unauthenticated requests may be limited.
 
-Positive weights are normalized proportionally; omitted attention does not become zero. Request caps count chat attempts across all runs using this state file. The date for chat quota is UTC; digest/watch dates use the configured local time zone. Embeddings have separate costs.
+Positive weights are normalized proportionally; omitted attention does not become zero. Request caps count API chat attempts or Codex CLI invocations across all runs using this state file. Codex batch entries do not each consume a request; CLI output limits are independent of API `max_output_tokens`. The date for chat quota is UTC; digest/watch dates use the configured local time zone. Embeddings have separate costs.
 
 Edit config only when no other process is modifying it. `follow`/`unfollow` use atomic replacement; comments are not preserved. `serve` uses a state-file lock to avoid overlapping real runs. `preview` may run alongside it and shares the transactional chat cap.

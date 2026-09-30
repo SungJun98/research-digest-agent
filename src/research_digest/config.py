@@ -204,6 +204,14 @@ class WebhookConfig(StrictModel):
     url_env: EnvName
 
 
+class SlackConfig(WebhookConfig):
+    url_env: EnvName = 'DIGEST_SLACK_WEBHOOK'
+    transport: Literal['webhook', 'external'] = 'webhook'
+    workspace_name: str = ''
+    channel_name: str = ''
+    channel_id: str | None = Field(default=None, pattern=r'^[CG][A-Z0-9]+$')
+
+
 class MarkdownConfig(StrictModel):
     enabled: bool = True
     directory: Path = Path('~/.local/share/research-digest/digests')
@@ -214,15 +222,19 @@ class NotificationConfig(StrictModel):
     default_watch_policy: Policy = 'next_digest'
     max_chars_per_paper: int = Field(default=400, ge=100, le=2000)
     email: EmailConfig = Field(default_factory=EmailConfig)
-    slack: WebhookConfig = Field(default_factory=lambda: WebhookConfig(url_env='DIGEST_SLACK_WEBHOOK'))
+    slack: SlackConfig = Field(default_factory=SlackConfig)
     discord: WebhookConfig = Field(default_factory=lambda: WebhookConfig(url_env='DIGEST_DISCORD_WEBHOOK'))
     markdown: MarkdownConfig = Field(default_factory=MarkdownConfig)
 
 
 class LLMConfig(StrictModel):
     enabled: bool = True
+    backend: Literal['api', 'codex_cli'] = 'api'
     base_url: str = 'https://api.openai.com/v1'
     model: str = ''
+    codex_command: str = 'codex'
+    codex_timeout_seconds: int = Field(default=240, ge=10, le=1800)
+    codex_batch_size: int = Field(default=5, ge=1, le=10)
     api_key_env: EnvName = 'DIGEST_LLM_API_KEY'
     max_requests_per_day: int = Field(default=80, ge=1, le=10000)
     max_output_tokens: int = Field(default=1800, ge=200, le=10000)
@@ -289,7 +301,7 @@ def write_initial_config(path: Path, answers: dict[str, str]) -> None:
 
 def validate_secrets(cfg: AppConfig, env: Mapping[str, str]) -> list[str]:
     required: list[str] = []
-    if cfg.llm.enabled:
+    if cfg.llm.enabled and cfg.llm.backend == 'api':
         required.append(cfg.llm.api_key_env)
     if cfg.retrieval.embeddings_enabled:
         required.append(cfg.retrieval.embedding_key_env)
@@ -299,9 +311,10 @@ def validate_secrets(cfg: AppConfig, env: Mapping[str, str]) -> list[str]:
         required.append(cfg.notifications.email.password_env)
         if cfg.notifications.email.username_env:
             required.append(cfg.notifications.email.username_env)
-    for channel in [cfg.notifications.slack, cfg.notifications.discord]:
-        if channel.enabled:
-            required.append(channel.url_env)
+    if cfg.notifications.slack.enabled and cfg.notifications.slack.transport == 'webhook':
+        required.append(cfg.notifications.slack.url_env)
+    if cfg.notifications.discord.enabled:
+        required.append(cfg.notifications.discord.url_env)
     return sorted({name for name in required if not env.get(name)})
 
 

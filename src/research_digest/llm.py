@@ -38,8 +38,11 @@ class Evaluator:
         self.max_output_tokens,self.json_mode = max_output_tokens,json_mode
         self.clock,self.sleep = clock or (lambda:datetime.now(timezone.utc)),sleep
 
+    def _cache_key(self,payload):
+        return hashlib.sha256(json.dumps([self.base_url,self.model,EVALUATION_RULES,payload,self.max_output_tokens,self.json_mode],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
     def _call(self,payload):
-        key=hashlib.sha256(json.dumps([self.base_url,self.model,EVALUATION_RULES,payload,self.max_output_tokens,self.json_mode],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        key=self._cache_key(payload)
         cached=self.store.get_cache('evaluation',key)
         if cached: return cached,key
         if not self.api_key or not self.model: raise InvalidEvaluation('LLM configuration is missing')
@@ -83,10 +86,13 @@ class Evaluator:
         if not context: result.evidence=min(result.evidence,4)
         return result
 
-    def evaluate(self,paper,topics):
+    def _evaluation_payload(self,paper,topics):
         if not paper.abstract.strip(): raise InvalidEvaluation('abstract unavailable')
-        payload={'schema':Evaluation.model_json_schema(),'operation':'evaluate','title':paper.title,'abstract':paper.abstract[:16000],
+        return {'schema':Evaluation.model_json_schema(),'operation':'evaluate','title':paper.title,'abstract':paper.abstract[:16000],
                  'source_url':paper.url,'topics':[t.model_dump() for t in topics],'lenses':self.lenses,'exclude':self.exclude,'language':self.language}
+
+    def evaluate(self,paper,topics):
+        payload=self._evaluation_payload(paper,topics)
         raw,key=self._call(payload)
         # Validation uses exactly the bounded source sent to the provider.
         result=self._validate(raw,paper.model_copy(update={'abstract':payload['abstract']}),topics)
