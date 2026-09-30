@@ -121,13 +121,19 @@ def tick(config: Path = typer.Option(default_config_path(),'--config')):
 def outbox(claim:bool=typer.Option(False,'--claim'),config: Path = typer.Option(default_config_path(),'--config')):
     """Export immutable pending external Slack messages as JSON without acknowledging."""
     import json
+    from datetime import datetime,timezone
+    from zoneinfo import ZoneInfo
     from .store import Store
     cfg=read_config(config)
     if cfg.notifications.slack.transport!='external':
         typer.echo('외부 Slack 전달 모드가 필요합니다.',err=True);raise typer.Exit(2)
     store=Store(cfg.state_path)
+    if claim and not cfg.notifications.slack.enabled:
+        typer.echo('[]');return
+    local_day=datetime.now(timezone.utc).astimezone(ZoneInfo(cfg.schedule.timezone)).date().isoformat()
+    pending=store.claim_external_notifications('slack',local_day) if claim else store.pending_notifications()
     messages=[dict(id=n.id,subject=n.subject,body=n.body,kind=n.kind,local_day=n.local_day)
-              for n in store.pending_notifications() if 'slack' in n.pending_channels and (not claim or store.reserve_delivery(n.id,'slack'))]
+              for n in pending if 'slack' in n.pending_channels]
     typer.echo(json.dumps(messages,ensure_ascii=False))
 
 
@@ -135,7 +141,9 @@ def outbox(claim:bool=typer.Option(False,'--claim'),config: Path = typer.Option(
 def ack(notification_id:str,message_url:str=typer.Option(...,'--message-url'),config:Path=typer.Option(default_config_path(),'--config')):
     """Acknowledge a known external Slack payload after a confirmed send; retain its receipt."""
     import re
+    import sqlite3
     from datetime import datetime,timezone
+    from zoneinfo import ZoneInfo
     from urllib.parse import urlparse
     from .store import Store
     cfg=read_config(config);slack=cfg.notifications.slack
@@ -146,13 +154,13 @@ def ack(notification_id:str,message_url:str=typer.Option(...,'--message-url'),co
     if not slack.enabled or slack.transport!='external' or url.scheme!='https' or not slack_host or not match or url.query or url.fragment or (slack.channel_id and match[1]!=slack.channel_id):
         typer.echo('확인된 대상 Slack 메시지 링크가 필요합니다.',err=True);raise typer.Exit(2)
     store=Store(cfg.state_path)
-    with store.connection() as db:
-        known=db.execute('SELECT status FROM deliveries WHERE notification_id=? AND channel=?',(notification_id,'slack')).fetchone()
-    if not known:
+    now=datetime.now(timezone.utc)
+    try:
+        store.acknowledge_external_delivery(notification_id,'slack',{'message_url':message_url,'acknowledged_at':now.isoformat()},now.astimezone(ZoneInfo(cfg.schedule.timezone)).date().isoformat())
+    except ValueError:
         typer.echo('알 수 없는 알림입니다.',err=True);raise typer.Exit(2)
-    if known[0]!='delivered':
-        store.mark_delivered(notification_id,'slack')
-        store.put_cache('external_delivery_receipt',notification_id,{'message_url':message_url,'acknowledged_at':datetime.now(timezone.utc).isoformat()})
+    except sqlite3.Error:
+        typer.echo('전송 기록을 저장하지 못했습니다. 메시지 링크를 보존하고 ack를 재시도하세요.',err=True);raise typer.Exit(1) from None
     typer.echo('Slack 전달 완료를 기록했습니다.')
 
 

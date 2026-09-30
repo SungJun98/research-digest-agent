@@ -16,7 +16,7 @@ if sys.argv[1:]==['login','status']:
 args=sys.argv[1:]
 assert '--ignore-user-config' in args and '--ephemeral' in args
 assert args[args.index('--sandbox')+1]=='read-only'
-for feature in ['shell_tool','apps','plugins','hooks']:
+for feature in ['shell_tool','apps','plugins','hooks','view_image','goals']:
     assert any(args[i:i+2]==['--disable',feature] for i in range(len(args)-1))
 payload=json.loads(sys.stdin.read().split('\\nINPUT_JSON\\n')[-1])
 counter=Path(__file__+'.calls')
@@ -31,6 +31,7 @@ else: result=data
 if mode=='invented': result=dict(data,evidence_spans=[{'text':'Invented evidence','source':'abstract','url':'https://arxiv.org/abs/2609.12345'}])
 Path(args[args.index('--output-last-message')+1]).write_text(json.dumps(result))
 print(json.dumps({'type':'turn.completed'}))
+if mode=='unexpected_image':print(json.dumps({'type':'item.completed','item':{'type':'image_view'}}))
 '''.replace('DATA',repr(data)).replace('MODE',repr(mode)))
     script.chmod(0o700)
     return script
@@ -62,7 +63,7 @@ def test_codex_evaluation_uses_login_and_preserves_validation_cache_budget(tmp_p
         evaluator.evaluate(paper.model_copy(update={'title':'Changed title'}),topics)
 
 
-@pytest.mark.parametrize('mode',['failed','invented'])
+@pytest.mark.parametrize('mode',['failed','invented','unexpected_image'])
 def test_codex_failure_or_unsupported_evidence_is_rejected(tmp_path,mode):
     from research_digest.llm import InvalidEvaluation
     evaluator,_,topics=build(tmp_path,mode)

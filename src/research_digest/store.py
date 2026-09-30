@@ -196,15 +196,58 @@ class Store:
 
     def mark_delivered(self, key: str, channel: str) -> None:
         with self.connection() as db:
-            db.execute("INSERT OR REPLACE INTO deliveries VALUES(?,?,'delivered',0)", (key, channel))
-            row = db.execute('SELECT paper_ids,event_ids FROM notifications WHERE id=?', (key,)).fetchone()
-            if row:
-                for paper_id in json.loads(row[0]):
-                    db.execute('INSERT OR IGNORE INTO paper_delivery VALUES(?,?,?)', (self._resolve(db, paper_id), channel, key))
-                remaining = db.execute("SELECT 1 FROM deliveries WHERE notification_id=? AND status!='delivered'", (key,)).fetchone()
-                if not remaining:
-                    for event_id in json.loads(row[1]):
-                        db.execute('UPDATE events SET done=1 WHERE id=?', (event_id,))
+            self._mark_delivered(db,key,channel)
+
+    def _mark_delivered(self, db, key, channel):
+        db.execute("INSERT OR REPLACE INTO deliveries VALUES(?,?,'delivered',0)", (key, channel))
+        row = db.execute('SELECT paper_ids,event_ids FROM notifications WHERE id=?', (key,)).fetchone()
+        if row:
+            for paper_id in json.loads(row[0]):
+                db.execute('INSERT OR IGNORE INTO paper_delivery VALUES(?,?,?)', (self._resolve(db, paper_id), channel, key))
+            remaining = db.execute("SELECT 1 FROM deliveries WHERE notification_id=? AND status!='delivered'", (key,)).fetchone()
+            if not remaining:
+                for event_id in json.loads(row[1]):
+                    db.execute('UPDATE events SET done=1 WHERE id=?', (event_id,))
+
+    def acknowledge_external_delivery(self, key: str, channel: str, receipt: dict, local_day: str) -> None:
+        """Commit a confirmed receipt, delivery and recovery slot together, once."""
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT d.status,n.kind,n.local_day FROM deliveries d JOIN notifications n ON n.id=d.notification_id WHERE d.notification_id=? AND d.channel=?',(key,channel)).fetchone()
+            if not row:raise ValueError('unknown notification')
+            if row['status']=='delivered':return
+            db.execute('INSERT INTO cache VALUES(?,?,?)',('external_delivery_receipt',key,json.dumps(receipt)))
+            self._mark_delivered(db,key,channel)
+            if row['kind']=='digest' and row['local_day']:
+                db.execute('INSERT OR REPLACE INTO runs VALUES(?,?)',('digest_covered_day',local_day))
+                db.execute('INSERT OR REPLACE INTO runs VALUES(?,?)',('digest_covered_payload',row['local_day']))
+                pending=db.execute("SELECT 1 FROM deliveries d JOIN notifications n ON n.id=d.notification_id WHERE n.kind='digest' AND n.local_day=? AND d.status!='delivered'",(row['local_day'],)).fetchone()
+                last=db.execute("SELECT value FROM runs WHERE kind='digest'").fetchone()
+                if not pending and (not last or row['local_day']>last[0]):
+                    db.execute('INSERT OR REPLACE INTO runs VALUES(?,?)',('digest',row['local_day']))
+
+    def claim_external_notifications(self, channel: str, local_day: str) -> list[Notification]:
+        """Lease one digest day and remove alias duplicates in a single transaction."""
+        now=time.time()
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            rows=db.execute("SELECT n.*,d.status,d.lease_until FROM notifications n JOIN deliveries d ON n.id=d.notification_id WHERE d.channel=? AND d.status!='delivered' ORDER BY n.rowid",(channel,)).fetchall()
+            eligible=[]
+            for row in rows:
+                paper_ids=json.loads(row['paper_ids'])
+                if paper_ids and all(db.execute('SELECT 1 FROM paper_delivery WHERE paper_id=? AND channel=?',(self._resolve(db,p),channel)).fetchone() for p in paper_ids):
+                    self._mark_delivered(db,row['id'],channel)
+                else:eligible.append(row)
+            covered=db.execute("SELECT value FROM runs WHERE kind='digest_covered_day'").fetchone()
+            payload=db.execute("SELECT value FROM runs WHERE kind='digest_covered_payload'").fetchone()
+            allowed_day=payload[0] if covered and covered[0]==local_day and payload else next((r['local_day'] for r in eligible if r['kind']=='digest'),None)
+            result=[]
+            for row in eligible:
+                if row['kind']=='digest' and row['local_day']!=allowed_day:continue
+                if row['status']=='sending' and row['lease_until']>now:continue
+                db.execute("UPDATE deliveries SET status='sending',lease_until=? WHERE notification_id=? AND channel=?",(now+300,row['id'],channel))
+                result.append(Notification(row['id'],row['subject'],row['body'],[channel],json.loads(row['paper_ids']),json.loads(row['event_ids']),row['local_day'],row['kind']))
+            return result
 
     def notification_complete(self, key: str) -> bool:
         with self.connection() as db:

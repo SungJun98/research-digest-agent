@@ -56,7 +56,7 @@ class CodexEvaluator(Evaluator):
             schema_path.write_text(json.dumps(strict_schema(schema)))
             args=[executable,'exec','--ignore-user-config','--sandbox','read-only','--ephemeral','--skip-git-repo-check',
                   '--cd',temporary,'--output-schema',str(schema_path),'--output-last-message',str(output),'--json']
-            for feature in ['shell_tool','apps','plugins','hooks','browser_use','computer_use','multi_agent']:
+            for feature in ['shell_tool','apps','plugins','hooks','browser_use','computer_use','multi_agent','view_image','goals','image_generation']:
                 args.extend(['--disable',feature])
             args.extend(['-c','web_search="disabled"'])
             if self.cli_model:args.extend(['--model',self.cli_model])
@@ -75,7 +75,7 @@ class CodexEvaluator(Evaluator):
                     raise InvalidEvaluation('Codex turn did not complete')
                 for record in records:
                     item=record.get('item') or {}
-                    if record.get('type')=='turn.failed' or item.get('type') in {'command_execution','mcp_tool_call','web_search','file_change'}:
+                    if record.get('type')=='turn.failed' or (item and item.get('type') not in {'reasoning','agent_message'}):
                         raise InvalidEvaluation('Codex assessment attempted an unexpected tool')
                 return json.loads(output.read_text())
             except InvalidEvaluation:raise
